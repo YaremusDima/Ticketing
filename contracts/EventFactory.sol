@@ -56,10 +56,10 @@ contract EventFactory is Ownable(msg.sender) {
         return newEventAddress;
     }
 
-    // Get all active events
-    function getActiveEvents() public view returns (address[] memory) {
-        return activeEvents;
-    }
+    // // Get all active events
+    // function getActiveEvents() public view returns (address[] memory) {
+    //     return activeEvents;
+    // }
 
     // Get events's details
     function getEventsDetails(address eventAddress)

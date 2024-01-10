@@ -11,7 +11,7 @@ contract EventNFT is Context, AccessControl, ERC721{
     using Counters for Counters.Counter;
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     uint public constant RESALE_COMISSION = 10; //комиссия перепродажи в процентах
-    uint public constant MAX_TIKET_NUMBER = 5;
+    uint public constant MAX_TICKET_NUMBER = 5;
 
     Counters.Counter public _ticketId; // количество сминченных NFT // TODO private
     Counters.Counter public _saleTicketId; // количество проданных NFT // TODO private
@@ -55,14 +55,16 @@ contract EventNFT is Context, AccessControl, ERC721{
     /*
         Модификаторы
     */
-    modifier isMinterRole {
+    // Ограничение по количеству билетов на адрес
+    modifier isValidNumberOfTickets(address customer) {
         require(
-            hasRole(MINTER_ROLE, _msgSender()),
-            "User must have minter role to mint"
+            _numberOfPurchasedTickets[customer] < MAX_TICKET_NUMBER,
+            "One address can maximum buy only MAX_TICKET_NUMBER tickets"
         );
         _;
     }
 
+    // Ограничение по цене перепродажи билетов
     modifier isValidSellAmount(uint256 ticketId) {
         uint256 purchasePrice = _ticketDetails[ticketId].purchasePrice;
         uint256 sellingPrice = _ticketDetails[ticketId].sellingPrice;
@@ -82,9 +84,12 @@ contract EventNFT is Context, AccessControl, ERC721{
     function mint(address operator)
         internal
         virtual
-        isMinterRole
         returns (uint256)
     {
+        require(
+            hasRole(MINTER_ROLE, _msgSender()),
+            "User must have minter role to mint"
+        );
         _ticketId.increment();
         uint256 newTicketId = _ticketId.current();
         _mint(operator, newTicketId);
@@ -124,7 +129,7 @@ contract EventNFT is Context, AccessControl, ERC721{
      * Adds buyer to tickets mapping
      * Update ticket details
      */
-    function transferTicket(address buyer) public {
+    function transferTicket(address buyer) public isValidNumberOfTickets(buyer) {
         _saleTicketId.increment();
         uint256 saleTicketId = _saleTicketId.current();
 
@@ -135,9 +140,6 @@ contract EventNFT is Context, AccessControl, ERC721{
 
         transferFrom(ownerOf(saleTicketId), buyer, saleTicketId);
 
-        // if (!isCustomerExist(buyer)) {
-        //     customers.push(buyer);
-        // }
         _purchasedTickets[buyer][saleTicketId] = true;
         _numberOfPurchasedTickets[buyer] += 1;
     }
@@ -153,6 +155,7 @@ contract EventNFT is Context, AccessControl, ERC721{
     function secondaryTransferTicket(address buyer, uint256 saleTicketId)
         public
         isValidSellAmount(saleTicketId)
+        isValidNumberOfTickets(buyer)
     {
         address seller = ownerOf(saleTicketId);
         uint256 sellingPrice = _ticketDetails[saleTicketId].sellingPrice;
@@ -208,16 +211,6 @@ contract EventNFT is Context, AccessControl, ERC721{
 
         approve(operator, ticketId);
     }
-
-    // // Utility function to check if customer exists to avoid redundancy
-    // function isCustomerExist(address buyer) internal view returns (bool) {
-    //     for (uint256 i = 0; i < customers.length; i++) {
-    //         if (customers[i] == buyer) {
-    //             return true;
-    //         }
-    //     }
-    //     return false;
-    // }
 
     /*
         Get-functions
